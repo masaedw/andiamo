@@ -13,8 +13,8 @@ const UNITS = [
   scene: "フィレンツェの語学学校、初日の教室で",
   grammarTag: "essere の活用・否定文",
   speakers: {
-    A: { name: "Marco", role: "クラスメイト" },
-    B: { name: "Yui", role: "あなた（日本人留学生）" },
+    A: { name: "Marco", role: "クラスメイト", gender: "m", style: "くだけた tu で話す。口癖は Senti（ねえ）と Dai（さあ・ねえってば）" },
+    B: { name: "Yui", role: "あなた（日本人留学生）", gender: "f", style: "学習者らしい素直で丁寧な話し方" },
   },
   dialogue: [
     { s: "A", it: "Ciao! Sono Marco. E tu?", ja: "やあ！僕はマルコ。君は？" },
@@ -25,7 +25,7 @@ const UNITS = [
     { s: "B", it: "Davvero? Anche tu sei studente qui?", ja: "本当？あなたもここの学生？" },
     { s: "A", it: "Sì, sono studente. Anche tu?", ja: "うん、学生だよ。君も？" },
     { s: "B", it: "Sì! Sono molto contenta.", ja: "うん！とても嬉しい。" },
-    { s: "A", it: "Com'è Firenze per te?", ja: "君にとってフィレンツェはどう？" },
+    { s: "A", it: "Senti, com'è Firenze per te?", ja: "ねえ、君にとってフィレンツェはどう？" },
     { s: "B", it: "È bellissima! E le persone sono gentili.", ja: "すごく綺麗！それに人々が親切。" },
     { s: "A", it: "È vero. Allora, a domani, Yui!", ja: "確かにね。じゃあ、また明日、ユイ！" },
     { s: "B", it: "A domani, Marco! Ciao!", ja: "また明日、マルコ！じゃあね！" },
@@ -102,8 +102,8 @@ const UNITS = [
   scene: "フィレンツェの青空市場、果物の屋台で",
   grammarTag: "名詞の性・複数形・冠詞・avere",
   speakers: {
-    A: { name: "Fruttivendolo", role: "果物屋の主人" },
-    B: { name: "Yui", role: "あなた" },
+    A: { name: "Fruttivendolo", role: "果物屋の主人", gender: "m", style: "下町の商人口調。威勢がよく、Mi dica!（ご注文どうぞ）が決まり文句" },
+    B: { name: "Yui", role: "あなた", gender: "f", style: "店では丁寧な Lei を使う" },
   },
   dialogue: [
     { s: "A", it: "Buongiorno, signorina! Mi dica!", ja: "おはようございます、お嬢さん！何にしましょう？" },
@@ -208,8 +208,8 @@ const UNITS = [
   scene: "ヴェネツィアの土産物店で。店主と出身地の話になる",
   grammarTag: "-are 動詞の活用・出身の表現",
   speakers: {
-    A: { name: "Negoziante", role: "土産物店の店主" },
-    B: { name: "Yui", role: "あなた" },
+    A: { name: "Negoziante", role: "土産物店の店主", gender: "m", style: "丁寧な Lei。お喋り好きで Che bello!（いいですね）とよく感嘆する" },
+    B: { name: "Yui", role: "あなた", gender: "f", style: "丁寧な Lei で受け答えする" },
   },
   dialogue: [
     { s: "A", it: "Buonasera! Cerca qualcosa?", ja: "こんばんは！何かお探しですか？" },
@@ -302,8 +302,8 @@ const UNITS = [
   scene: "フィレンツェ・サンタ・マリア・ノヴェッラ駅の窓口で",
   grammarTag: "-ere / -ire 動詞・時刻表現",
   speakers: {
-    A: { name: "Yui", role: "あなた" },
-    B: { name: "Bigliettaio", role: "切符売り場の係員" },
+    A: { name: "Yui", role: "あなた", gender: "f", style: "窓口なので丁寧に簡潔に" },
+    B: { name: "Bigliettaio", role: "切符売り場の係員", gender: "m", style: "事務的で簡潔。必要なことだけ短く言う" },
   },
   dialogue: [
     { s: "A", it: "Buongiorno. Un biglietto per Roma, per favore.", ja: "こんにちは。ローマまでの切符を1枚お願いします。" },
@@ -404,8 +404,8 @@ const UNITS = [
   scene: "ローマの下町のトラットリアで。給仕係に好みを伝えておすすめを聞く",
   grammarTag: "piacere の構文・食事の流れ",
   speakers: {
-    A: { name: "Cameriere", role: "給仕係" },
-    B: { name: "Yui", role: "あなた" },
+    A: { name: "Cameriere", role: "給仕係", gender: "m", style: "慇懃なプロの給仕。Ottima scelta!（素晴らしい選択）などの誉め言葉を多用" },
+    B: { name: "Yui", role: "あなた", gender: "f", style: "丁寧な Lei。好みははっきり伝える" },
   },
   dialogue: [
     { s: "A", it: "Buonasera! Ecco il menù. Le porto qualcosa da bere?", ja: "こんばんは！メニューをどうぞ。お飲み物をお持ちしましょうか？" },
@@ -502,8 +502,8 @@ const UNITS = [
   scene: "フィレンツェの小さなホテルのフロントでチェックイン",
   grammarTag: "volere / potere / dovere + 不定詞",
   speakers: {
-    A: { name: "Receptionist", role: "フロント係" },
-    B: { name: "Yui", role: "あなた" },
+    A: { name: "Receptionist", role: "フロント係", gender: "f", style: "丁寧で世話焼き。Non si preoccupi（ご心配なく）が口癖" },
+    B: { name: "Yui", role: "あなた", gender: "f", style: "丁寧な Lei。確認を細かく取る" },
   },
   dialogue: [
     { s: "A", it: "Buonasera! Posso aiutarLa?", ja: "こんばんは！お手伝いいたしましょうか？" },
@@ -598,8 +598,8 @@ const UNITS = [
   scene: "フィレンツェの路上で、通行人にドゥオーモへの道を聞く",
   grammarTag: "前置詞・冠詞前置詞・位置関係",
   speakers: {
-    A: { name: "Yui", role: "あなた" },
-    B: { name: "Passante", role: "親切な通行人" },
+    A: { name: "Yui", role: "あなた", gender: "f", style: "聞き取った道順を復唱して確認する" },
+    B: { name: "Passante", role: "親切な通行人", gender: "m", style: "気さくな世話焼き。Si figuri!（とんでもない）と返すのが癖" },
   },
   dialogue: [
     { s: "A", it: "Scusi, posso chiederLe un'informazione?", ja: "すみません、ちょっとお尋ねしてもいいですか？" },
@@ -710,8 +710,8 @@ const UNITS = [
   scene: "月曜の朝、語学学校の教室で。マルコと週末の報告",
   grammarTag: "近過去（passato prossimo）",
   speakers: {
-    A: { name: "Marco", role: "クラスメイト（第1課ぶり）" },
-    B: { name: "Yui", role: "あなた" },
+    A: { name: "Marco", role: "クラスメイト（第1課ぶり）", gender: "m", style: "くだけた tu。口癖は Senti と Dai" },
+    B: { name: "Yui", role: "あなた", gender: "f", style: "親しい相手なので tu でくだけて話す" },
   },
   dialogue: [
     { s: "A", it: "Ciao Yui! Com'è andato il weekend?", ja: "やあユイ！週末はどうだった？" },
@@ -726,7 +726,7 @@ const UNITS = [
     { s: "B", it: "Che film avete visto?", ja: "何の映画を見たの？" },
     { s: "A", it: "Un film italiano. Non ho capito tutto, ma mi è piaciuto molto.", ja: "イタリア映画。全部はわからなかったけど、すごく気に入ったよ。" },
     { s: "B", it: "Anch'io voglio vedere un film italiano!", ja: "私もイタリア映画を見てみたい！" },
-    { s: "A", it: "Allora andiamo insieme il prossimo weekend!", ja: "じゃあ、来週末一緒に行こうよ！" },
+    { s: "A", it: "Dai, andiamo insieme il prossimo weekend!", ja: "ねえ、来週末一緒に行こうよ！" },
     { s: "B", it: "Volentieri!", ja: "喜んで！" },
   ],
   grammar: `

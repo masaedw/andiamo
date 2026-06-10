@@ -283,7 +283,19 @@ body.no-voice .tts { background: var(--line); cursor: not-allowed; }
   border-radius: 6px;
   background: #fff;
 }
-.dialogue-cast { font-size: 13px; color: var(--ink-soft); margin-bottom: 18px; }
+.dialogue-cast {
+  margin-bottom: 18px;
+  padding: 10px 16px;
+  border-left: 3px solid var(--gold);
+  background: rgba(255, 255, 255, 0.4);
+}
+.cast-row { font-size: 13px; color: var(--ink-soft); }
+.cast-style {
+  display: block;
+  font-size: 12px;
+  color: var(--olive);
+  padding-left: 1em;
+}
 
 .dialogue { display: flex; flex-direction: column; gap: 14px; }
 

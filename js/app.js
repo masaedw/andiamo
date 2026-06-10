@@ -6,20 +6,24 @@
 // ---------------------------------------------------------------- TTS
 const TTS = {
   voice: null,
+  pool: [],
   rate: 1.0,
   ready: false,
 
   init() {
     if (!("speechSynthesis" in window)) return;
+    const score = v =>
+      (/premium|enhanced/i.test(v.name) ? 4 : 0) +
+      (/siri/i.test(v.name) ? 3 : 0) +
+      (/google/i.test(v.name) ? 2 : 0) +
+      (/novelty|grandma|grandpa|organ|cellos|bells|bad news|good news|bubbles|trinoids|zarvox|jester|whisper/i.test(v.name) ? -10 : 0);
     const pick = () => {
       const voices = speechSynthesis.getVoices();
       if (!voices.length) return;
-      const it = voices.filter(v => v.lang.toLowerCase().startsWith("it"));
-      // 品質の高そうな音声を優先（プレミアム/拡張 → Google → 既定）
-      this.voice =
-        it.find(v => /premium|enhanced|siri/i.test(v.name)) ||
-        it.find(v => /google/i.test(v.name)) ||
-        it[0] || null;
+      this.pool = voices
+        .filter(v => v.lang.toLowerCase().startsWith("it"))
+        .sort((a, b) => score(b) - score(a));
+      this.voice = this.pool[0] || null;
       this.ready = true;
       document.body.classList.toggle("no-voice", !this.voice);
     };
@@ -27,11 +31,42 @@ const TTS = {
     speechSynthesis.onvoiceschanged = pick;
   },
 
-  speak(text, { rate = this.rate, pitch = 1.0, onend = null } = {}) {
+  // 音声名から性別を推定（macOS / Google の既知のイタリア語音声）
+  voiceGender(v) {
+    if (/luca|eddy|reed|rocko|diego|cosimo|riccardo|giuseppe/i.test(v.name)) return "m";
+    if (/alice|federica|emma|paola|elsa|flo|sandy|shelley|isabella|google/i.test(v.name)) return "f";
+    return null;
+  },
+
+  // 登場人物ごとに別の声を割り当てる。
+  // 性別の合う声 → 未使用の声を優先。声が足りなければ同じ声+ピッチ差で区別する。
+  speakerProfiles(speakers) {
+    const used = new Set();
+    const profiles = {};
+    // 主人公（role が「あなた」）を先に割り当て、課をまたいで同じ声に固定する
+    const entries = Object.entries(speakers).sort(
+      ([, a], [, b]) => (b.role.includes("あなた") ? 1 : 0) - (a.role.includes("あなた") ? 1 : 0));
+    for (const [key, sp] of entries) {
+      const candidates = this.pool.filter(v => this.voiceGender(v) === sp.gender);
+      const fresh = candidates.find(v => !used.has(v.name)) ||
+                    this.pool.find(v => !used.has(v.name));
+      const voice = fresh || candidates[0] || this.voice;
+      const reused = !voice || used.has(voice.name);
+      if (voice) used.add(voice.name);
+      profiles[key] = {
+        voice,
+        // 同じ声を使い回すときだけピッチで差を付ける
+        pitch: reused ? (sp.gender === "f" ? 1.18 : 0.88) : 1.0,
+      };
+    }
+    return profiles;
+  },
+
+  speak(text, { rate = this.rate, pitch = 1.0, voice = null, onend = null } = {}) {
     if (!("speechSynthesis" in window)) return;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "it-IT";
-    if (this.voice) u.voice = this.voice;
+    u.voice = voice || this.voice;
     u.rate = rate;
     u.pitch = pitch;
     if (onend) u.onend = onend;
@@ -179,10 +214,11 @@ function renderDialogue(unit, el) {
         </select>
       </label>
     </div>
-    <p class="dialogue-cast">${
-      Object.entries(unit.speakers)
-        .map(([k, s]) => `<b>${s.name}</b>（${s.role}）`).join(" × ")
-    }</p>
+    <div class="dialogue-cast">
+      ${Object.entries(unit.speakers).map(([k, s]) => `
+        <p class="cast-row"><b>${s.name}</b>（${s.role}）${s.style ? `<span class="cast-style">${s.style}</span>` : ""}</p>
+      `).join("")}
+    </div>
     <div class="dialogue">
       ${unit.dialogue.map((line, i) => {
         const sp = unit.speakers[line.s];
@@ -205,29 +241,35 @@ function renderDialogue(unit, el) {
     el.querySelector(".dialogue").classList.toggle("hide-ja", e.target.checked);
   });
 
-  // 1行再生（話者で声の高さを変える）
-  const pitchOf = s => (s === "A" ? 0.95 : 1.15);
+  // 人物ごとの声（再生時に算出 — 音声リストは非同期に読み込まれるため）
+  const voiceOf = s => TTS.speakerProfiles(unit.speakers)[s] || {};
+
+  // 1行再生
   el.querySelectorAll(".line-play").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
       TTS.stop();
       const i = Number(btn.dataset.i);
       const line = unit.dialogue[i];
+      const prof = voiceOf(line.s);
       highlight(el, i);
-      TTS.speak(line.it, { rate: getRate(), pitch: pitchOf(line.s), onend: () => highlight(el, -1) });
+      TTS.speak(line.it, { rate: getRate(), voice: prof.voice, pitch: prof.pitch, onend: () => highlight(el, -1) });
     });
   });
 
   // 全体再生 — 行を順番に読み、再生中の行をハイライト
   el.querySelector("#play-all").addEventListener("click", () => {
     TTS.stop();
+    const profiles = TTS.speakerProfiles(unit.speakers);
     const playFrom = i => {
       if (i >= unit.dialogue.length) { highlight(el, -1); return; }
       const line = unit.dialogue[i];
+      const prof = profiles[line.s] || {};
       highlight(el, i);
       TTS.speak(line.it, {
         rate: getRate(),
-        pitch: pitchOf(line.s),
+        voice: prof.voice,
+        pitch: prof.pitch,
         onend: () => setTimeout(() => playFrom(i + 1), 350),
       });
     };
