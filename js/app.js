@@ -1,0 +1,466 @@
+// Andiamo! — アプリ本体
+// ルーティング(hash) / TTS / 会話・文法・単語・クイズの描画 / 進捗(localStorage)
+
+"use strict";
+
+// ---------------------------------------------------------------- TTS
+const TTS = {
+  voice: null,
+  rate: 1.0,
+  ready: false,
+
+  init() {
+    if (!("speechSynthesis" in window)) return;
+    const pick = () => {
+      const voices = speechSynthesis.getVoices();
+      if (!voices.length) return;
+      const it = voices.filter(v => v.lang.toLowerCase().startsWith("it"));
+      // 品質の高そうな音声を優先（プレミアム/拡張 → Google → 既定）
+      this.voice =
+        it.find(v => /premium|enhanced|siri/i.test(v.name)) ||
+        it.find(v => /google/i.test(v.name)) ||
+        it[0] || null;
+      this.ready = true;
+      document.body.classList.toggle("no-voice", !this.voice);
+    };
+    pick();
+    speechSynthesis.onvoiceschanged = pick;
+  },
+
+  speak(text, { rate = this.rate, pitch = 1.0, onend = null } = {}) {
+    if (!("speechSynthesis" in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "it-IT";
+    if (this.voice) u.voice = this.voice;
+    u.rate = rate;
+    u.pitch = pitch;
+    if (onend) u.onend = onend;
+    speechSynthesis.speak(u);
+    return u;
+  },
+
+  stop() {
+    if ("speechSynthesis" in window) speechSynthesis.cancel();
+  },
+};
+
+// ---------------------------------------------------------------- 進捗
+const Progress = {
+  KEY: "andiamo-progress",
+  data: {},
+  load() {
+    try { this.data = JSON.parse(localStorage.getItem(this.KEY)) || {}; }
+    catch { this.data = {}; }
+  },
+  save() { localStorage.setItem(this.KEY, JSON.stringify(this.data)); },
+  unit(id) {
+    if (!this.data[id]) this.data[id] = { tabs: {}, quizBest: null };
+    return this.data[id];
+  },
+  visitTab(id, tab) {
+    this.unit(id).tabs[tab] = true;
+    this.save();
+  },
+  recordQuiz(id, pct) {
+    const u = this.unit(id);
+    if (u.quizBest == null || pct > u.quizBest) u.quizBest = pct;
+    this.save();
+  },
+  isComplete(id) {
+    const u = this.data[id];
+    return !!(u && u.quizBest != null && u.quizBest >= 80);
+  },
+};
+
+// ---------------------------------------------------------------- ルーティング
+const app = document.getElementById("app");
+const TABS = [
+  { key: "dialogo", label: "会話", it: "Dialogo" },
+  { key: "grammatica", label: "文法", it: "Grammatica" },
+  { key: "parole", label: "単語", it: "Parole" },
+  { key: "quiz", label: "クイズ", it: "Quiz" },
+];
+
+function route() {
+  TTS.stop();
+  const m = location.hash.match(/^#\/unit\/(\d+)(?:\/(\w+))?/);
+  if (m) {
+    const unit = UNITS.find(u => u.id === Number(m[1]));
+    if (unit) { renderUnit(unit, m[2] || "dialogo"); return; }
+  }
+  renderHome();
+}
+
+// ---------------------------------------------------------------- ホーム
+function renderHome() {
+  const done = UNITS.filter(u => Progress.isComplete(u.id)).length;
+  app.innerHTML = `
+    <header class="hero">
+      <div class="hero-deco" aria-hidden="true">CIAO·CIAO·CIAO·</div>
+      <p class="hero-kicker">Corso d'italiano per giapponesi</p>
+      <h1>Andiamo<span class="bang">!</span></h1>
+      <p class="hero-sub">会話で覚えるイタリア語 — 全8課</p>
+      <p class="hero-progress">${done} / ${UNITS.length} 課 完了${done === UNITS.length ? " · Complimenti!" : ""}</p>
+    </header>
+    <main class="unit-list">
+      ${UNITS.map(u => {
+        const p = Progress.data[u.id];
+        const complete = Progress.isComplete(u.id);
+        const started = p && Object.keys(p.tabs || {}).length > 0;
+        return `
+        <a class="unit-card ${complete ? "complete" : ""}" href="#/unit/${u.id}">
+          <span class="unit-num">${String(u.id).padStart(2, "0")}</span>
+          <span class="unit-body">
+            <span class="unit-title-it">${u.titleIt}</span>
+            <span class="unit-title-ja">${u.titleJa}</span>
+            <span class="unit-tags">
+              <span class="tag tag-grammar">${u.grammarTag}</span>
+            </span>
+          </span>
+          <span class="unit-status">${
+            complete ? `<span class="badge done">完了 ${p.quizBest}%</span>`
+            : p && p.quizBest != null ? `<span class="badge">クイズ ${p.quizBest}%</span>`
+            : started ? `<span class="badge">学習中</span>` : ""
+          }</span>
+        </a>`;
+      }).join("")}
+    </main>
+    <footer class="site-footer">
+      <p>音声: ブラウザ内蔵のイタリア語音声（Web Speech API）を使用。</p>
+      <p class="voice-warning">イタリア語の音声が見つからない。OS の設定でイタリア語音声を追加すると再生できる。</p>
+    </footer>`;
+}
+
+// ---------------------------------------------------------------- 課ページ
+function renderUnit(unit, tab) {
+  Progress.visitTab(unit.id, tab);
+  const prev = UNITS.find(u => u.id === unit.id - 1);
+  const next = UNITS.find(u => u.id === unit.id + 1);
+
+  app.innerHTML = `
+    <header class="unit-header">
+      <a class="back" href="#/">← 全課一覧</a>
+      <p class="lesson-label">Lezione ${String(unit.id).padStart(2, "0")}</p>
+      <h1>${unit.titleIt}</h1>
+      <p class="unit-header-ja">${unit.titleJa}</p>
+      <p class="scene">📍 ${unit.scene}</p>
+      <nav class="tabs">
+        ${TABS.map(t => `
+          <a class="tab ${t.key === tab ? "active" : ""}" href="#/unit/${unit.id}/${t.key}">
+            <span class="tab-it">${t.it}</span><span class="tab-ja">${t.label}</span>
+          </a>`).join("")}
+      </nav>
+    </header>
+    <main class="unit-main" id="tab-content"></main>
+    <nav class="unit-nav">
+      ${prev ? `<a href="#/unit/${prev.id}">← ${String(prev.id).padStart(2, "0")} ${prev.titleIt}</a>` : "<span></span>"}
+      ${next ? `<a href="#/unit/${next.id}">${String(next.id).padStart(2, "0")} ${next.titleIt} →</a>` : "<span></span>"}
+    </nav>`;
+
+  const content = document.getElementById("tab-content");
+  if (tab === "dialogo") renderDialogue(unit, content);
+  else if (tab === "grammatica") renderGrammar(unit, content);
+  else if (tab === "parole") renderVocab(unit, content);
+  else if (tab === "quiz") renderQuiz(unit, content);
+}
+
+// ---------------------------------------------------------------- 会話タブ
+function renderDialogue(unit, el) {
+  el.innerHTML = `
+    <div class="dialogue-controls">
+      <button class="btn primary" id="play-all">▶ 全体を再生</button>
+      <button class="btn" id="stop-all">■ 停止</button>
+      <label class="control"><input type="checkbox" id="hide-ja"> 日本語訳を隠す</label>
+      <label class="control">速度
+        <select id="rate">
+          <option value="0.7">ゆっくり (0.7×)</option>
+          <option value="0.85">少しゆっくり (0.85×)</option>
+          <option value="1" selected>ふつう (1.0×)</option>
+        </select>
+      </label>
+    </div>
+    <p class="dialogue-cast">${
+      Object.entries(unit.speakers)
+        .map(([k, s]) => `<b>${s.name}</b>（${s.role}）`).join(" × ")
+    }</p>
+    <div class="dialogue">
+      ${unit.dialogue.map((line, i) => {
+        const sp = unit.speakers[line.s];
+        return `
+        <div class="line side-${line.s}" data-i="${i}">
+          <div class="bubble">
+            <span class="speaker">${sp.name}</span>
+            <p class="it">${line.it}</p>
+            <p class="ja">${line.ja}</p>
+            <button class="tts line-play" data-i="${i}" title="この行を再生"></button>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
+
+  const rateSel = el.querySelector("#rate");
+  const getRate = () => Number(rateSel.value);
+
+  el.querySelector("#hide-ja").addEventListener("change", e => {
+    el.querySelector(".dialogue").classList.toggle("hide-ja", e.target.checked);
+  });
+
+  // 1行再生（話者で声の高さを変える）
+  const pitchOf = s => (s === "A" ? 0.95 : 1.15);
+  el.querySelectorAll(".line-play").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      TTS.stop();
+      const i = Number(btn.dataset.i);
+      const line = unit.dialogue[i];
+      highlight(el, i);
+      TTS.speak(line.it, { rate: getRate(), pitch: pitchOf(line.s), onend: () => highlight(el, -1) });
+    });
+  });
+
+  // 全体再生 — 行を順番に読み、再生中の行をハイライト
+  el.querySelector("#play-all").addEventListener("click", () => {
+    TTS.stop();
+    const playFrom = i => {
+      if (i >= unit.dialogue.length) { highlight(el, -1); return; }
+      const line = unit.dialogue[i];
+      highlight(el, i);
+      TTS.speak(line.it, {
+        rate: getRate(),
+        pitch: pitchOf(line.s),
+        onend: () => setTimeout(() => playFrom(i + 1), 350),
+      });
+    };
+    playFrom(0);
+  });
+
+  el.querySelector("#stop-all").addEventListener("click", () => {
+    TTS.stop();
+    highlight(el, -1);
+  });
+}
+
+function highlight(el, i) {
+  el.querySelectorAll(".line").forEach(l => {
+    l.classList.toggle("playing", Number(l.dataset.i) === i);
+  });
+  if (i >= 0) {
+    const line = el.querySelector(`.line[data-i="${i}"]`);
+    if (line) line.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+}
+
+// ---------------------------------------------------------------- 文法タブ
+function renderGrammar(unit, el) {
+  el.innerHTML = `<div class="grammar">${unit.grammar}</div>`;
+}
+
+// ---------------------------------------------------------------- 単語タブ
+function renderVocab(unit, el) {
+  el.innerHTML = `
+    <div class="vocab-controls">
+      <button class="btn" id="mode-list">一覧</button>
+      <button class="btn" id="mode-cards">フラッシュカード</button>
+      <button class="btn" id="play-all-vocab">▶ 全部聞く</button>
+    </div>
+    <div id="vocab-body"></div>`;
+
+  const body = el.querySelector("#vocab-body");
+  const setActive = id => {
+    ["mode-list", "mode-cards"].forEach(b =>
+      el.querySelector("#" + b).classList.toggle("primary", b === id));
+  };
+
+  const showList = () => {
+    setActive("mode-list");
+    body.innerHTML = `
+      <table class="vocab-table">
+        ${unit.vocab.map(v => `
+          <tr>
+            <td class="v-it">${v.it} <button class="tts" data-tts="${ttsText(v.it)}"></button></td>
+            <td class="v-ja">${v.ja}</td>
+          </tr>`).join("")}
+      </table>`;
+  };
+
+  const showCards = () => {
+    setActive("mode-cards");
+    let order = unit.vocab.map((_, i) => i);
+    shuffle(order);
+    let pos = 0;
+    const draw = () => {
+      const v = unit.vocab[order[pos]];
+      body.innerHTML = `
+        <div class="flashcard" id="card">
+          <p class="fc-count">${pos + 1} / ${order.length}</p>
+          <p class="fc-it">${v.it}</p>
+          <p class="fc-ja hidden" id="fc-answer">${v.ja}</p>
+          <div class="fc-actions">
+            <button class="tts big" data-tts="${ttsText(v.it)}"></button>
+            <button class="btn" id="fc-reveal">答えを見る</button>
+          </div>
+          <div class="fc-nav">
+            <button class="btn" id="fc-prev" ${pos === 0 ? "disabled" : ""}>← 前へ</button>
+            <button class="btn primary" id="fc-next">${pos === order.length - 1 ? "もう一周" : "次へ →"}</button>
+          </div>
+        </div>`;
+      TTS.stop();
+      TTS.speak(ttsText(v.it));
+      body.querySelector("#fc-reveal").addEventListener("click", () => {
+        body.querySelector("#fc-answer").classList.remove("hidden");
+      });
+      body.querySelector("#fc-next").addEventListener("click", () => {
+        pos += 1;
+        if (pos >= order.length) { shuffle(order); pos = 0; }
+        draw();
+      });
+      body.querySelector("#fc-prev").addEventListener("click", () => {
+        if (pos > 0) { pos -= 1; draw(); }
+      });
+    };
+    draw();
+  };
+
+  el.querySelector("#mode-list").addEventListener("click", showList);
+  el.querySelector("#mode-cards").addEventListener("click", showCards);
+  el.querySelector("#play-all-vocab").addEventListener("click", () => {
+    TTS.stop();
+    const playFrom = i => {
+      if (i >= unit.vocab.length) return;
+      TTS.speak(ttsText(unit.vocab[i].it), { onend: () => setTimeout(() => playFrom(i + 1), 500) });
+    };
+    playFrom(0);
+  });
+
+  showList();
+}
+
+// "il bicchiere / la xxx" のような併記や注記を、読み上げ用に整える
+function ttsText(it) {
+  return it.replace(/\(.*?\)/g, "").replace(/\s*\/\s*/g, ", ").trim();
+}
+
+// ---------------------------------------------------------------- クイズタブ
+const QUIZ_LEN = 8;
+const QUIZ_PASS = 80;
+
+function renderQuiz(unit, el) {
+  const best = Progress.unit(unit.id).quizBest;
+  el.innerHTML = `
+    <div class="quiz-intro">
+      <h3>単語クイズ</h3>
+      <p>この課の単語から ${QUIZ_LEN} 問を出題。${QUIZ_PASS}% 以上で課の完了。</p>
+      ${best != null ? `<p class="quiz-best">自己ベスト: <b>${best}%</b>${best >= QUIZ_PASS ? " — 合格済み" : ""}</p>` : ""}
+      <button class="btn primary" id="quiz-start">クイズを始める</button>
+    </div>`;
+  el.querySelector("#quiz-start").addEventListener("click", () => startQuiz(unit, el));
+}
+
+function startQuiz(unit, el) {
+  const pool = unit.vocab.map((_, i) => i);
+  shuffle(pool);
+  const questions = pool.slice(0, QUIZ_LEN).map(idx => {
+    const v = unit.vocab[idx];
+    const dir = Math.random() < 0.5 ? "it2ja" : "ja2it";
+    const wrong = unit.vocab.filter((_, i) => i !== idx);
+    shuffle(wrong);
+    const options = [v, ...wrong.slice(0, 3)];
+    shuffle(options);
+    return { v, dir, options };
+  });
+
+  let pos = 0;
+  let correct = 0;
+
+  const draw = () => {
+    if (pos >= questions.length) { finish(); return; }
+    const q = questions[pos];
+    const prompt = q.dir === "it2ja"
+      ? `<p class="q-prompt it">${q.v.it} <button class="tts" data-tts="${ttsText(q.v.it)}"></button></p><p class="q-ask">意味は？</p>`
+      : `<p class="q-prompt ja">${q.v.ja}</p><p class="q-ask">イタリア語は？</p>`;
+    el.innerHTML = `
+      <div class="quiz">
+        <p class="q-count">第 ${pos + 1} 問 / ${questions.length}</p>
+        ${prompt}
+        <div class="q-options">
+          ${q.options.map((o, i) => `
+            <button class="btn option" data-i="${i}">
+              ${q.dir === "it2ja" ? o.ja : o.it}
+            </button>`).join("")}
+        </div>
+        <p class="q-feedback" id="q-feedback"></p>
+      </div>`;
+    if (q.dir === "it2ja") TTS.speak(ttsText(q.v.it));
+
+    const fb = el.querySelector("#q-feedback");
+    el.querySelectorAll(".option").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const chosen = q.options[Number(btn.dataset.i)];
+        const isRight = chosen === q.v;
+        el.querySelectorAll(".option").forEach(b => {
+          b.disabled = true;
+          const o = q.options[Number(b.dataset.i)];
+          if (o === q.v) b.classList.add("right");
+          else if (b === btn) b.classList.add("wrong");
+        });
+        if (isRight) correct += 1;
+        fb.innerHTML = isRight
+          ? `<span class="ok">正解 — ${q.v.it}: ${q.v.ja}</span>`
+          : `<span class="ng">不正解 — 正しくは <b>${q.dir === "it2ja" ? q.v.ja : q.v.it}</b></span>`;
+        if (q.dir === "ja2it") TTS.speak(ttsText(q.v.it));
+        const nextBtn = document.createElement("button");
+        nextBtn.className = "btn primary";
+        nextBtn.textContent = pos === questions.length - 1 ? "結果を見る" : "次の問題 →";
+        nextBtn.addEventListener("click", () => { pos += 1; draw(); });
+        fb.appendChild(document.createElement("br"));
+        fb.appendChild(nextBtn);
+      });
+    });
+  };
+
+  const finish = () => {
+    const pct = Math.round((correct / questions.length) * 100);
+    Progress.recordQuiz(unit.id, pct);
+    const passed = pct >= QUIZ_PASS;
+    el.innerHTML = `
+      <div class="quiz-result ${passed ? "passed" : ""}">
+        <p class="result-pct">${pct}%</p>
+        <p class="result-msg">${
+          passed ? "Complimenti! この課は完了。" : `あと少し。${QUIZ_PASS}% 以上で完了になる。`
+        }</p>
+        <p>${correct} / ${questions.length} 問正解</p>
+        <div class="result-actions">
+          <button class="btn" id="quiz-retry">もう一度</button>
+          ${passed && unit.id < UNITS.length
+            ? `<a class="btn primary" href="#/unit/${unit.id + 1}">次の課へ →</a>`
+            : `<a class="btn" href="#/">課の一覧へ</a>`}
+        </div>
+      </div>`;
+    el.querySelector("#quiz-retry").addEventListener("click", () => startQuiz(unit, el));
+  };
+
+  draw();
+}
+
+// ---------------------------------------------------------------- 共通
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// data-tts ボタンの一括ハンドリング（文法解説・単語表で使用）
+document.addEventListener("click", e => {
+  const btn = e.target.closest("[data-tts]");
+  if (!btn) return;
+  TTS.stop();
+  TTS.speak(btn.dataset.tts);
+});
+
+// ---------------------------------------------------------------- 起動
+TTS.init();
+Progress.load();
+window.addEventListener("hashchange", route);
+route();
