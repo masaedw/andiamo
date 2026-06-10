@@ -147,7 +147,7 @@ const UNITS = [
     <tr><th>男性</th><td><b>il</b></td><td><b>i</b></td><td>il mercato / i mercati <button class="tts" data-tts="il mercato, i mercati"></button></td></tr>
     <tr><th>男性（s+子音, z 等の前）</th><td><b>lo</b></td><td><b>gli</b></td><td>lo studente / gli studenti <button class="tts" data-tts="lo studente, gli studenti"></button></td></tr>
     <tr><th>女性</th><td><b>la</b></td><td><b>le</b></td><td>la mela / le mele <button class="tts" data-tts="la mela, le mele"></button></td></tr>
-    <tr><th>母音の前（単数）</th><td><b>l'</b></td><td>i / gli / le</td><td>l'acqua / le acque <button class="tts" data-tts="l'acqua, le acque"></button></td></tr>
+    <tr><th>母音の前（単数）</th><td><b>l'</b></td><td><b>i</b> / <b>gli</b> / <b>le</b></td><td>l'acqua / le acque <button class="tts" data-tts="l'acqua, le acque"></button></td></tr>
   </table>
 </section>
 <section>
