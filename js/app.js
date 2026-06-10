@@ -41,7 +41,20 @@ const TTS = {
 
   // 登場人物ごとに別の声を割り当てる。
   // 性別の合う声 → 未使用の声を優先。声が足りなければ同じ声+ピッチ差で区別する。
+  // ユーザーが声を固定指定している場合はそれを返す
+  overrideVoice() {
+    return this.voiceOverride
+      ? this.pool.find(v => v.name === this.voiceOverride) || null
+      : null;
+  },
+
   speakerProfiles(speakers) {
+    // 声の固定指定時は全員同じ声になるため、性別ピッチで区別する
+    const ov = this.overrideVoice();
+    if (ov) {
+      return Object.fromEntries(Object.entries(speakers).map(([key, sp]) =>
+        [key, { voice: ov, pitch: sp.gender === "f" ? 1.1 : 0.9 }]));
+    }
     const used = new Set();
     const profiles = {};
     // 主人公（role が「あなた」）を先に割り当て、課をまたいで同じ声に固定する
@@ -74,7 +87,7 @@ const TTS = {
     for (const [pat, rep] of this.PRONUNCIATIONS) text = text.replace(pat, rep);
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "it-IT";
-    u.voice = voice || this.voice;
+    u.voice = this.overrideVoice() || voice || this.voice;
     u.rate = rate;
     u.pitch = pitch;
     if (onend) u.onend = onend;
@@ -84,6 +97,53 @@ const TTS = {
 
   stop() {
     if ("speechSynthesis" in window) speechSynthesis.cancel();
+  },
+};
+
+// ---------------------------------------------------------------- 音声設定（全画面共通・永続化）
+const AudioSettings = {
+  load() {
+    const r = parseFloat(localStorage.getItem("andiamo-rate"));
+    if (r > 0) TTS.rate = r;
+    TTS.voiceOverride = localStorage.getItem("andiamo-voice") || null;
+  },
+  setRate(r) {
+    TTS.rate = r;
+    localStorage.setItem("andiamo-rate", String(r));
+  },
+  setVoice(name) {
+    TTS.voiceOverride = name || null;
+    if (name) localStorage.setItem("andiamo-voice", name);
+    else localStorage.removeItem("andiamo-voice");
+  },
+
+  RATES: [
+    { v: 0.7, label: "ゆっくり (0.7×)" },
+    { v: 0.85, label: "少しゆっくり (0.85×)" },
+    { v: 1.0, label: "ふつう (1.0×)" },
+  ],
+
+  // 速度・声のセレクタ。課ページの全タブに共通で効く
+  renderBar() {
+    return `
+    <div class="audio-settings">
+      <label class="control">速度
+        <select id="set-rate">
+          ${this.RATES.map(r => `<option value="${r.v}" ${TTS.rate === r.v ? "selected" : ""}>${r.label}</option>`).join("")}
+        </select>
+      </label>
+      <label class="control">声
+        <select id="set-voice">
+          <option value="">自動（人物ごと）</option>
+          ${TTS.pool.map(v => `<option value="${v.name}" ${TTS.voiceOverride === v.name ? "selected" : ""}>${v.name}</option>`).join("")}
+        </select>
+      </label>
+    </div>`;
+  },
+
+  wireBar(root) {
+    root.querySelector("#set-rate").addEventListener("change", e => this.setRate(Number(e.target.value)));
+    root.querySelector("#set-voice").addEventListener("change", e => this.setVoice(e.target.value));
   },
 };
 
@@ -193,6 +253,7 @@ function renderUnit(unit, tab) {
             <span class="tab-it">${t.it}</span><span class="tab-ja">${t.label}</span>
           </a>`).join("")}
       </nav>
+      ${AudioSettings.renderBar()}
     </header>
     <main class="unit-main" id="tab-content"></main>
     <nav class="unit-nav">
@@ -200,6 +261,7 @@ function renderUnit(unit, tab) {
       ${next ? `<a href="#/unit/${next.id}">${String(next.id).padStart(2, "0")} ${next.titleIt} →</a>` : "<span></span>"}
     </nav>`;
 
+  AudioSettings.wireBar(app);
   const content = document.getElementById("tab-content");
   if (tab === "dialogo") renderDialogue(unit, content);
   else if (tab === "grammatica") renderGrammar(unit, content);
@@ -214,13 +276,6 @@ function renderDialogue(unit, el) {
       <button class="btn primary" id="play-all">▶ 全体を再生</button>
       <button class="btn" id="stop-all">■ 停止</button>
       <label class="control"><input type="checkbox" id="hide-ja"> 日本語訳を隠す</label>
-      <label class="control">速度
-        <select id="rate">
-          <option value="0.7">ゆっくり (0.7×)</option>
-          <option value="0.85">少しゆっくり (0.85×)</option>
-          <option value="1" selected>ふつう (1.0×)</option>
-        </select>
-      </label>
     </div>
     <div class="dialogue-cast">
       ${Object.entries(unit.speakers).map(([k, s]) => `
@@ -242,9 +297,6 @@ function renderDialogue(unit, el) {
       }).join("")}
     </div>`;
 
-  const rateSel = el.querySelector("#rate");
-  const getRate = () => Number(rateSel.value);
-
   el.querySelector("#hide-ja").addEventListener("change", e => {
     el.querySelector(".dialogue").classList.toggle("hide-ja", e.target.checked);
   });
@@ -261,7 +313,7 @@ function renderDialogue(unit, el) {
       const line = unit.dialogue[i];
       const prof = voiceOf(line.s);
       highlight(el, i);
-      TTS.speak(line.it, { rate: getRate(), voice: prof.voice, pitch: prof.pitch, onend: () => highlight(el, -1) });
+      TTS.speak(line.it, { voice: prof.voice, pitch: prof.pitch, onend: () => highlight(el, -1) });
     });
   });
 
@@ -275,7 +327,6 @@ function renderDialogue(unit, el) {
       const prof = profiles[line.s] || {};
       highlight(el, i);
       TTS.speak(line.it, {
-        rate: getRate(),
         voice: prof.voice,
         pitch: prof.pitch,
         onend: () => setTimeout(() => playFrom(i + 1), 350),
@@ -511,6 +562,7 @@ document.addEventListener("click", e => {
 
 // ---------------------------------------------------------------- 起動
 TTS.init();
+AudioSettings.load();
 Progress.load();
 window.addEventListener("hashchange", route);
 route();

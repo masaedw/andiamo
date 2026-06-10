@@ -207,6 +207,18 @@ body.no-voice .voice-warning { display: block; }
 .tab-it { font-family: var(--font-display); font-style: italic; font-size: 15px; }
 .tab-ja { font-size: 11px; opacity: 0.75; }
 
+.audio-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 10px 14px;
+  background: var(--paper-deep);
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  font-size: 13px;
+}
+
 .unit-main { padding: 32px 0; }
 
 .unit-nav {
