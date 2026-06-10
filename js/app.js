@@ -65,7 +65,7 @@ const TTS = {
 
   // 外来語の読み上げ補正（表示はそのまま、音声だけイタリア語の綴り規則に合わせる）
   PRONUNCIATIONS: [
-    [/\bYui\b/g, "Iui"],     // Y を文字名 "i greca" と読んでしまうため
+    [/\bYui\b/g, "Iùi"],     // Y を文字名 "i greca" と読むのを防ぎ、ù の強勢で「ユ」を強調
     [/\bTokyo\b/g, "Tokio"], // イタリア語表記
   ],
 
