@@ -253,8 +253,8 @@ function renderUnit(unit, tab) {
             <span class="tab-it">${t.it}</span><span class="tab-ja">${t.label}</span>
           </a>`).join("")}
       </nav>
-      ${AudioSettings.renderBar()}
     </header>
+    ${AudioSettings.renderBar()}
     <main class="unit-main" id="tab-content"></main>
     <nav class="unit-nav">
       ${prev ? `<a href="#/unit/${prev.id}">← ${String(prev.id).padStart(2, "0")} ${prev.titleIt}</a>` : "<span></span>"}

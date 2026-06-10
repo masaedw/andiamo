@@ -208,6 +208,9 @@ body.no-voice .voice-warning { display: block; }
 .tab-ja { font-size: 11px; opacity: 0.75; }
 
 .audio-settings {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
@@ -217,6 +220,7 @@ body.no-voice .voice-warning { display: block; }
   border-top: none;
   border-radius: 0 0 8px 8px;
   font-size: 13px;
+  box-shadow: 0 4px 14px rgba(43, 33, 24, 0.08);
 }
 
 .unit-main { padding: 32px 0; }
