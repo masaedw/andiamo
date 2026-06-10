@@ -13,7 +13,8 @@ const TTS = {
   init() {
     if (!("speechSynthesis" in window)) return;
     const score = v =>
-      (/premium|enhanced/i.test(v.name) ? 4 : 0) +
+      (/premium|プレミアム/i.test(v.name) ? 5 : 0) +
+      (/enhanced|拡張/i.test(v.name) ? 4 : 0) +
       (/siri/i.test(v.name) ? 3 : 0) +
       (/google/i.test(v.name) ? 2 : 0) +
       (/novelty|grandma|grandpa|organ|cellos|bells|bad news|good news|bubbles|trinoids|zarvox|jester|whisper/i.test(v.name) ? -10 : 0);
