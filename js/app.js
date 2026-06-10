@@ -63,8 +63,15 @@ const TTS = {
     return profiles;
   },
 
+  // 外来語の読み上げ補正（表示はそのまま、音声だけイタリア語の綴り規則に合わせる）
+  PRONUNCIATIONS: [
+    [/\bYui\b/g, "Iui"],     // Y を文字名 "i greca" と読んでしまうため
+    [/\bTokyo\b/g, "Tokio"], // イタリア語表記
+  ],
+
   speak(text, { rate = this.rate, pitch = 1.0, voice = null, onend = null } = {}) {
     if (!("speechSynthesis" in window)) return;
+    for (const [pat, rep] of this.PRONUNCIATIONS) text = text.replace(pat, rep);
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "it-IT";
     u.voice = voice || this.voice;
