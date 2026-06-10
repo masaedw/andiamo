@@ -265,7 +265,10 @@ function renderUnit(unit, tab) {
           </a>`).join("")}
       </nav>
     </header>
-    ${AudioSettings.renderBar()}
+    <div class="sticky-bar">
+      ${AudioSettings.renderBar()}
+      <div id="tab-controls"></div>
+    </div>
     <main class="unit-main" id="tab-content"></main>
     <nav class="unit-nav">
       ${prev ? `<a href="#/unit/${prev.id}">← ${String(prev.id).padStart(2, "0")} ${prev.titleIt}</a>` : "<span></span>"}
@@ -282,13 +285,15 @@ function renderUnit(unit, tab) {
 
 // ---------------------------------------------------------------- 会話タブ
 function renderDialogue(unit, el) {
-  el.innerHTML = `
+  const controls = document.getElementById("tab-controls");
+  controls.innerHTML = `
     <div class="dialogue-controls">
       <button class="btn primary" id="play-all">▶ 全体を再生</button>
       <button class="btn" id="pause-resume" disabled>⏸ 一時停止</button>
       <button class="btn" id="stop-all">■ 停止</button>
       <label class="control"><input type="checkbox" id="hide-ja"> 日本語訳を隠す</label>
-    </div>
+    </div>`;
+  el.innerHTML = `
     <div class="dialogue-cast">
       ${Object.entries(unit.speakers).map(([k, s]) => `
         <p class="cast-row"><b>${s.name}</b>（${s.role}）${s.style ? `<span class="cast-style">${s.style}</span>` : ""}</p>
@@ -309,7 +314,7 @@ function renderDialogue(unit, el) {
       }).join("")}
     </div>`;
 
-  el.querySelector("#hide-ja").addEventListener("change", e => {
+  controls.querySelector("#hide-ja").addEventListener("change", e => {
     el.querySelector(".dialogue").classList.toggle("hide-ja", e.target.checked);
   });
 
@@ -320,7 +325,7 @@ function renderDialogue(unit, el) {
   // 古いチェーンが進み続けるのを防ぐ
   let session = 0;
   let paused = false;
-  const pauseBtn = el.querySelector("#pause-resume");
+  const pauseBtn = controls.querySelector("#pause-resume");
 
   const setPaused = p => {
     paused = p;
@@ -357,7 +362,7 @@ function renderDialogue(unit, el) {
   });
 
   // 全体再生 — 行を順番に読み、再生中の行をハイライト
-  el.querySelector("#play-all").addEventListener("click", () => {
+  controls.querySelector("#play-all").addEventListener("click", () => {
     const sess = beginPlayback();
     const profiles = TTS.speakerProfiles(unit.speakers);
     const playFrom = i => {
@@ -380,7 +385,7 @@ function renderDialogue(unit, el) {
     else { TTS.pause(); setPaused(true); }
   });
 
-  el.querySelector("#stop-all").addEventListener("click", () => {
+  controls.querySelector("#stop-all").addEventListener("click", () => {
     session += 1;
     TTS.stop();
     endPlayback();
@@ -404,18 +409,19 @@ function renderGrammar(unit, el) {
 
 // ---------------------------------------------------------------- 単語タブ
 function renderVocab(unit, el) {
-  el.innerHTML = `
+  const controls = document.getElementById("tab-controls");
+  controls.innerHTML = `
     <div class="vocab-controls">
       <button class="btn" id="mode-list">一覧</button>
       <button class="btn" id="mode-cards">フラッシュカード</button>
       <button class="btn" id="play-all-vocab">▶ 全部聞く</button>
-    </div>
-    <div id="vocab-body"></div>`;
+    </div>`;
+  el.innerHTML = `<div id="vocab-body"></div>`;
 
   const body = el.querySelector("#vocab-body");
   const setActive = id => {
     ["mode-list", "mode-cards"].forEach(b =>
-      el.querySelector("#" + b).classList.toggle("primary", b === id));
+      controls.querySelector("#" + b).classList.toggle("primary", b === id));
   };
 
   const showList = () => {
@@ -468,9 +474,9 @@ function renderVocab(unit, el) {
     draw();
   };
 
-  el.querySelector("#mode-list").addEventListener("click", showList);
-  el.querySelector("#mode-cards").addEventListener("click", showCards);
-  el.querySelector("#play-all-vocab").addEventListener("click", () => {
+  controls.querySelector("#mode-list").addEventListener("click", showList);
+  controls.querySelector("#mode-cards").addEventListener("click", showCards);
+  controls.querySelector("#play-all-vocab").addEventListener("click", () => {
     TTS.stop();
     const playFrom = i => {
       if (i >= unit.vocab.length) return;
