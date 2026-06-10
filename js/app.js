@@ -95,8 +95,19 @@ const TTS = {
     return u;
   },
 
+  pause() {
+    if ("speechSynthesis" in window) speechSynthesis.pause();
+  },
+
+  resume() {
+    if ("speechSynthesis" in window) speechSynthesis.resume();
+  },
+
   stop() {
-    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    if (!("speechSynthesis" in window)) return;
+    speechSynthesis.cancel();
+    // 一時停止中に cancel すると以降の speak が再生されないブラウザがあるため解除しておく
+    speechSynthesis.resume();
   },
 };
 
@@ -274,6 +285,7 @@ function renderDialogue(unit, el) {
   el.innerHTML = `
     <div class="dialogue-controls">
       <button class="btn primary" id="play-all">▶ 全体を再生</button>
+      <button class="btn" id="pause-resume" disabled>⏸ 一時停止</button>
       <button class="btn" id="stop-all">■ 停止</button>
       <label class="control"><input type="checkbox" id="hide-ja"> 日本語訳を隠す</label>
     </div>
@@ -304,25 +316,53 @@ function renderDialogue(unit, el) {
   // 人物ごとの声（再生時に算出 — 音声リストは非同期に読み込まれるため）
   const voiceOf = s => TTS.speakerProfiles(unit.speakers)[s] || {};
 
+  // 再生セッション。停止・別再生の開始で無効化し、cancel 起因の onend で
+  // 古いチェーンが進み続けるのを防ぐ
+  let session = 0;
+  let paused = false;
+  const pauseBtn = el.querySelector("#pause-resume");
+
+  const setPaused = p => {
+    paused = p;
+    pauseBtn.textContent = p ? "▶ 再開" : "⏸ 一時停止";
+  };
+  const beginPlayback = () => {
+    session += 1;
+    TTS.stop();
+    setPaused(false);
+    pauseBtn.disabled = false;
+    return session;
+  };
+  const endPlayback = () => {
+    highlight(el, -1);
+    pauseBtn.disabled = true;
+    setPaused(false);
+  };
+
   // 1行再生
   el.querySelectorAll(".line-play").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
-      TTS.stop();
+      const sess = beginPlayback();
       const i = Number(btn.dataset.i);
       const line = unit.dialogue[i];
       const prof = voiceOf(line.s);
       highlight(el, i);
-      TTS.speak(line.it, { voice: prof.voice, pitch: prof.pitch, onend: () => highlight(el, -1) });
+      TTS.speak(line.it, {
+        voice: prof.voice,
+        pitch: prof.pitch,
+        onend: () => { if (sess === session) endPlayback(); },
+      });
     });
   });
 
   // 全体再生 — 行を順番に読み、再生中の行をハイライト
   el.querySelector("#play-all").addEventListener("click", () => {
-    TTS.stop();
+    const sess = beginPlayback();
     const profiles = TTS.speakerProfiles(unit.speakers);
     const playFrom = i => {
-      if (i >= unit.dialogue.length) { highlight(el, -1); return; }
+      if (sess !== session) return;
+      if (i >= unit.dialogue.length) { endPlayback(); return; }
       const line = unit.dialogue[i];
       const prof = profiles[line.s] || {};
       highlight(el, i);
@@ -335,9 +375,15 @@ function renderDialogue(unit, el) {
     playFrom(0);
   });
 
+  pauseBtn.addEventListener("click", () => {
+    if (paused) { TTS.resume(); setPaused(false); }
+    else { TTS.pause(); setPaused(true); }
+  });
+
   el.querySelector("#stop-all").addEventListener("click", () => {
+    session += 1;
     TTS.stop();
-    highlight(el, -1);
+    endPlayback();
   });
 }
 
