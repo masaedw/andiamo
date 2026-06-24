@@ -612,6 +612,19 @@ document.addEventListener("click", e => {
   TTS.speak(btn.dataset.tts);
 });
 
+// ---------------------------------------------------------------- iOS Safari TTS ウォームアップ
+// iOS Safari は最初のユーザー操作起点でないと speechSynthesis が動かない
+function warmupTTS() {
+  if (!("speechSynthesis" in window)) return;
+  const u = new SpeechSynthesisUtterance("");
+  u.volume = 0;
+  speechSynthesis.speak(u);
+  document.removeEventListener("touchstart", warmupTTS);
+  document.removeEventListener("click", warmupTTS);
+}
+document.addEventListener("touchstart", warmupTTS, { once: true });
+document.addEventListener("click", warmupTTS, { once: true });
+
 // ---------------------------------------------------------------- 起動
 TTS.init();
 AudioSettings.load();
