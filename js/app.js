@@ -49,15 +49,27 @@ const TTS = {
   },
 
   speakerProfiles(speakers) {
-    // 声の固定指定時は全員同じ声になるため、性別ピッチで区別する
     const ov = this.overrideVoice();
+    const singleVoice = this.pool.length <= 1;
     if (ov) {
       return Object.fromEntries(Object.entries(speakers).map(([key, sp]) =>
-        [key, { voice: ov, pitch: sp.gender === "f" ? 1.1 : 0.9 }]));
+        [key, { voice: ov, pitch: sp.gender === "f" ? 1.15 : 0.85, rateMod: 1.0 }]));
+    }
+    if (singleVoice) {
+      const voice = this.voice;
+      const entries = Object.entries(speakers);
+      const pitches = { f: [1.2, 1.35], m: [0.8, 0.65] };
+      const counts = { f: 0, m: 0 };
+      return Object.fromEntries(entries.map(([key, sp]) => {
+        const g = sp.gender || "m";
+        const idx = counts[g]++ || 0;
+        const p = (pitches[g] || pitches.m)[Math.min(idx, 1)];
+        const rateMod = idx === 0 ? 1.0 : 0.92;
+        return [key, { voice, pitch: p, rateMod }];
+      }));
     }
     const used = new Set();
     const profiles = {};
-    // 主人公（role が「あなた」）を先に割り当て、課をまたいで同じ声に固定する
     const entries = Object.entries(speakers).sort(
       ([, a], [, b]) => (b.role.includes("あなた") ? 1 : 0) - (a.role.includes("あなた") ? 1 : 0));
     for (const [key, sp] of entries) {
@@ -69,8 +81,8 @@ const TTS = {
       if (voice) used.add(voice.name);
       profiles[key] = {
         voice,
-        // 同じ声を使い回すときだけピッチで差を付ける
         pitch: reused ? (sp.gender === "f" ? 1.18 : 0.88) : 1.0,
+        rateMod: 1.0,
       };
     }
     return profiles;
@@ -82,13 +94,13 @@ const TTS = {
     [/\bTokyo\b/g, "Tokio"], // イタリア語表記
   ],
 
-  speak(text, { rate = this.rate, pitch = 1.0, voice = null, onend = null } = {}) {
+  speak(text, { rate = this.rate, rateMod = 1.0, pitch = 1.0, voice = null, onend = null } = {}) {
     if (!("speechSynthesis" in window)) return;
     for (const [pat, rep] of this.PRONUNCIATIONS) text = text.replace(pat, rep);
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "it-IT";
     u.voice = this.overrideVoice() || voice || this.voice;
-    u.rate = rate;
+    u.rate = rate * rateMod;
     u.pitch = pitch;
     if (onend) u.onend = onend;
     speechSynthesis.speak(u);
@@ -145,7 +157,7 @@ const AudioSettings = {
       </label>
       <label class="control">声
         <select id="set-voice">
-          <option value="">自動（人物ごと）</option>
+          <option value="">${TTS.pool.length <= 1 ? "自動（ピッチで区別）" : "自動（人物ごと）"}</option>
           ${TTS.pool.map(v => `<option value="${v.name}" ${TTS.voiceOverride === v.name ? "selected" : ""}>${v.name}</option>`).join("")}
         </select>
       </label>
@@ -356,6 +368,7 @@ function renderDialogue(unit, el) {
       TTS.speak(line.it, {
         voice: prof.voice,
         pitch: prof.pitch,
+        rateMod: prof.rateMod || 1.0,
         onend: () => { if (sess === session) endPlayback(); },
       });
     });
@@ -374,6 +387,7 @@ function renderDialogue(unit, el) {
       TTS.speak(line.it, {
         voice: prof.voice,
         pitch: prof.pitch,
+        rateMod: prof.rateMod || 1.0,
         onend: () => setTimeout(() => playFrom(i + 1), 350),
       });
     };
